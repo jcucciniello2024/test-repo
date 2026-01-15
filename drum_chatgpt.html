@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Educational Drum Machine</title>
+<style>
+  body {
+    font-family: system-ui, Arial, sans-serif;
+    background: #111;
+    color: #eee;
+    margin: 0;
+    padding: 20px;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: auto;
+  }
+
+  .controls {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    background: #2ecc71;
+    border: none;
+    color: #111;
+    padding: 10px 18px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+
+  button.stop {
+    background: #e74c3c;
+    color: #fff;
+  }
+
+  label {
+    font-size: 14px;
+  }
+
+  input[type="range"] {
+    width: 150px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 120px repeat(16, 1fr);
+    gap: 6px;
+  }
+
+  .track-label {
+    display: flex;
+    align-items: center;
+    justify-content: right;
+    padding-right: 10px;
+    font-weight: bold;
+  }
+
+  .step {
+    width: 100%;
+    padding-top: 100%;
+    position: relative;
+    cursor: pointer;
+    background: #333;
+    border-radius: 4px;
+  }
+
+  .step.active {
+    background: #2ecc71;
+  }
+
+  .step.current {
+    outline: 2px solid #f1c40f;
+  }
+
+  .step::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .legend {
+    margin-top: 25px;
+    background: #1c1c1c;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .legend strong {
+    color: #2ecc71;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎵 Educational Drum Machine</h1>
+
+  <div class="controls">
+    <button id="play">Play</button>
+    <button id="stop" class="stop">Stop</button>
+
+    <label>
+      Tempo: <span id="bpmValue">120</span> BPM
+      <br>
+      <input id="bpm" type="range" min="60" max="180" value="120">
+    </label>
+  </div>
+
+  <div id="grid" class="grid"></div>
+
+  <div class="legend">
+    <p><strong>How this works:</strong></p>
+    <ul>
+      <li>Each row is a drum sound (Kick, Snare, Hi-Hat).</li>
+      <li>Each column is a step in time (16 steps = one bar of 4/4).</li>
+      <li>Click squares to turn beats on or off.</li>
+      <li>Yellow outline shows the current beat.</li>
+      <li>Change the tempo to hear how BPM affects rhythm.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioContext();
+
+  const tracks = [
+    { name: "Kick", freq: 100 },
+    { name: "Snare", freq: 200 },
+    { name: "Hi-Hat", freq: 400 }
+  ];
+
+  const steps = 16;
+  const grid = document.getElementById("grid");
+
+  let pattern = tracks.map(() => Array(steps).fill(false));
+  let currentStep = 0;
+  let isPlaying = false;
+  let intervalId = null;
+
+  function createGrid() {
+    grid.innerHTML = "";
+
+    tracks.forEach((track, row) => {
+      const label = document.createElement("div");
+      label.className = "track-label";
+      label.textContent = track.name;
+      grid.appendChild(label);
+
+      for (let col = 0; col < steps; col++) {
+        const step = document.createElement("div");
+        step.className = "step";
+
+        step.addEventListener("click", () => {
+          pattern[row][col] = !pattern[row][col];
+          step.classList.toggle("active", pattern[row][col]);
+        });
+
+        grid.appendChild(step);
+      }
+    });
+  }
+
+  function playSound(freq, type) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.frequency.value = freq;
+    osc.type = type;
+
+    gain.gain.setValueAtTime(1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.21);
+  }
+
+  function stepPlay() {
+    const bpm = document.getElementById("bpm").value;
+    const stepDuration = (60 / bpm) / 4 * 1000;
+
+    const cells = document.querySelectorAll(".step");
+
+    cells.forEach(cell => cell.classList.remove("current"));
+
+    tracks.forEach((track, row) => {
+      if (pattern[row][currentStep]) {
+        if (track.name === "Kick") playSound(100, "sine");
+        if (track.name === "Snare") playSound(200, "triangle");
+        if (track.name === "Hi-Hat") playSound(600, "square");
+      }
+    });
+
+    tracks.forEach((_, row) => {
+      const index = row * steps + currentStep;
+      cells[index].classList.add("current");
+    });
+
+    currentStep = (currentStep + 1) % steps;
+
+    intervalId = setTimeout(stepPlay, stepDuration);
+  }
+
+  document.getElementById("play").onclick = async () => {
+    if (!isPlaying) {
+      await audioCtx.resume();
+      isPlaying = true;
+      stepPlay();
+    }
+  };
+
+  document.getElementById("stop").onclick = () => {
+    isPlaying = false;
+    clearTimeout(intervalId);
+    currentStep = 0;
+    document.querySelectorAll(".step").forEach(s => s.classList.remove("current"));
+  };
+
+  document.getElementById("bpm").oninput = (e) => {
+    document.getElementById("bpmValue").textContent = e.target.value;
+  };
+
+  createGrid();
+</script>
+</body>
+</html>
