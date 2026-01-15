@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Educational Drum Machine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .play-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .play-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .stop-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .stop-btn:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+
+        .clear-btn {
+            background: #ff9800;
+            color: white;
+        }
+
+        .clear-btn:hover {
+            background: #e68900;
+            transform: translateY(-2px);
+        }
+
+        .tempo-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+
+        .tempo-control label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .tempo-control input {
+            width: 200px;
+        }
+
+        .tempo-value {
+            font-weight: bold;
+            color: #667eea;
+            min-width: 70px;
+        }
+
+        .sequencer {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .track {
+            display: grid;
+            grid-template-columns: 100px repeat(16, 1fr);
+            gap: 5px;
+            align-items: center;
+        }
+
+        .track-label {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+            text-align: right;
+            padding-right: 10px;
+        }
+
+        .step {
+            aspect-ratio: 1;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .step:hover {
+            border-color: #667eea;
+            transform: scale(1.1);
+        }
+
+        .step.active {
+            background: #667eea;
+            border-color: #667eea;
+        }
+
+        .step.playing {
+            animation: pulse 0.2s;
+            box-shadow: 0 0 15px #667eea;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        .beat-marker {
+            height: 3px;
+            background: #333;
+            opacity: 0.3;
+            grid-column: span 1;
+            margin: 0 2px;
+        }
+
+        .beat-marker.strong {
+            opacity: 0.6;
+            height: 5px;
+        }
+
+        .info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .info strong {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🥁 Educational Drum Machine</h1>
+        <p class="subtitle">Click squares to create beats • Learn rhythm patterns</p>
+
+        <div class="controls">
+            <button class="play-btn" onclick="togglePlay()">▶ Play</button>
+            <button class="stop-btn" onclick="stop()">■ Stop</button>
+            <button class="clear-btn" onclick="clearAll()">Clear All</button>
+        </div>
+
+        <div class="tempo-control">
+            <label for="tempo">Tempo:</label>
+            <input type="range" id="tempo" min="60" max="180" value="120" oninput="updateTempo(this.value)">
+            <span class="tempo-value" id="tempoValue">120 BPM</span>
+        </div>
+
+        <div class="sequencer" id="sequencer"></div>
+
+        <div class="info">
+            <strong>How to use:</strong> Click on the squares to activate drum hits. Press Play to hear your pattern. Each row is a different drum sound, and each column represents a beat in time. Try creating a basic beat by activating the Kick on beats 1, 5, 9, and 13, and the Snare on beats 5 and 13!
+        </div>
+    </div>
+
+    <script>
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const sounds = [
+            { name: 'Kick', freq: 150, type: 'kick' },
+            { name: 'Snare', freq: 200, type: 'snare' },
+            { name: 'Hi-Hat', freq: 300, type: 'hihat' },
+            { name: 'Clap', freq: 250, type: 'clap' }
+        ];
+
+        const steps = 16;
+        let currentStep = 0;
+        let isPlaying = false;
+        let intervalId = null;
+        let tempo = 120;
+        
+        const pattern = sounds.map(() => Array(steps).fill(false));
+
+        function createSequencer() {
+            const sequencer = document.getElementById('sequencer');
+            
+            sounds.forEach((sound, trackIndex) => {
+                const track = document.createElement('div');
+                track.className = 'track';
+                
+                const label = document.createElement('div');
+                label.className = 'track-label';
+                label.textContent = sound.name;
+                track.appendChild(label);
+                
+                for (let step = 0; step < steps; step++) {
+                    const stepEl = document.createElement('div');
+                    stepEl.className = 'step';
+                    stepEl.dataset.track = trackIndex;
+                    stepEl.dataset.step = step;
+                    stepEl.onclick = () => toggleStep(trackIndex, step);
+                    track.appendChild(stepEl);
+                }
+                
+                sequencer.appendChild(track);
+            });
+        }
+
+        function toggleStep(track, step) {
+            pattern[track][step] = !pattern[track][step];
+            updateUI();
+        }
+
+        function updateUI() {
+            document.querySelectorAll('.step').forEach(el => {
+                const track = parseInt(el.dataset.track);
+                const step = parseInt(el.dataset.step);
+                el.classList.toggle('active', pattern[track][step]);
+            });
+        }
+
+        function playSound(type, freq) {
+            const now = audioContext.currentTime;
+            
+            if (type === 'kick') {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                
+                osc.frequency.setValueAtTime(freq, now);
+                osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.5);
+                
+                gain.gain.setValueAtTime(1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'snare') {
+                const noise = audioContext.createBufferSource();
+                const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.2, audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
+                
+                for (let i = 0; i < buffer.length; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                
+                noise.buffer = buffer;
+                
+                const noiseGain = audioContext.createGain();
+                const filter = audioContext.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 1000;
+                
+                noiseGain.gain.setValueAtTime(0.7, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                
+                noise.connect(filter);
+                filter.connect(noiseGain);
+                noiseGain.connect(audioContext.destination);
+                
+                noise.start(now);
+            } else if (type === 'hihat') {
+                const noise = audioContext.createBufferSource();
+                const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.05, audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
+                
+                for (let i = 0; i < buffer.length; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                
+                noise.buffer = buffer;
+                
+                const noiseGain = audioContext.createGain();
+                const filter = audioContext.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 7000;
+                
+                noiseGain.gain.setValueAtTime(0.3, now);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                
+                noise.connect(filter);
+                filter.connect(noiseGain);
+                noiseGain.connect(audioContext.destination);
+                
+                noise.start(now);
+            } else if (type === 'clap') {
+                for (let i = 0; i < 3; i++) {
+                    const noise = audioContext.createBufferSource();
+                    const buffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.05, audioContext.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    
+                    for (let j = 0; j < buffer.length; j++) {
+                        data[j] = Math.random() * 2 - 1;
+                    }
+                    
+                    noise.buffer = buffer;
+                    
+                    const noiseGain = audioContext.createGain();
+                    const filter = audioContext.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.value = 2000;
+                    
+                    noiseGain.gain.setValueAtTime(0.4, now + i * 0.01);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.01 + 0.05);
+                    
+                    noise.connect(filter);
+                    filter.connect(noiseGain);
+                    noiseGain.connect(audioContext.destination);
+                    
+                    noise.start(now + i * 0.01);
+                }
+            }
+        }
+
+        function playStep() {
+            document.querySelectorAll('.step').forEach(el => {
+                el.classList.remove('playing');
+                if (parseInt(el.dataset.step) === currentStep) {
+                    el.classList.add('playing');
+                }
+            });
+
+            sounds.forEach((sound, trackIndex) => {
+                if (pattern[trackIndex][currentStep]) {
+                    playSound(sound.type, sound.freq);
+                }
+            });
+
+            currentStep = (currentStep + 1) % steps;
+        }
+
+        function togglePlay() {
+            if (isPlaying) {
+                pause();
+            } else {
+                play();
+            }
+        }
+
+        function play() {
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            isPlaying = true;
+            const interval = (60 / tempo) * 1000 / 4;
+            intervalId = setInterval(playStep, interval);
+            document.querySelector('.play-btn').textContent = '⏸ Pause';
+        }
+
+        function pause() {
+            isPlaying = false;
+            clearInterval(intervalId);
+            document.querySelector('.play-btn').textContent = '▶ Play';
+        }
+
+        function stop() {
+            pause();
+            currentStep = 0;
+            document.querySelectorAll('.step').forEach(el => {
+                el.classList.remove('playing');
+            });
+        }
+
+        function clearAll() {
+            pattern.forEach(track => track.fill(false));
+            updateUI();
+        }
+
+        function updateTempo(value) {
+            tempo = value;
+            document.getElementById('tempoValue').textContent = value + ' BPM';
+            if (isPlaying) {
+                pause();
+                play();
+            }
+        }
+
+        createSequencer();
+    </script>
+</body>
+</html>
