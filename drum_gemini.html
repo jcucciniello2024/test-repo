@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Educational Drum Machine</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --panel: #16213e;
+            --accent: #e94560;
+            --active: #0f3460;
+            --step-on: #4ecca3;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: var(--panel);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-width: 800px;
+            width: 100%;
+        }
+
+        header { text-align: center; margin-bottom: 20px; }
+        
+        /* The Grid */
+        .sequencer {
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .track {
+            display: contents;
+        }
+
+        .instrument-label {
+            align-self: center;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 5px;
+        }
+
+        .step {
+            aspect-ratio: 1/1;
+            background: var(--active);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .step.active { background-color: var(--step-on); box-shadow: 0 0 10px var(--step-on); }
+        .step.playing { border: 2px solid white; transform: scale(1.1); }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #30475e;
+        }
+
+        button#play-btn {
+            padding: 10px 30px;
+            background: var(--accent);
+            border: none;
+            color: white;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .edu-box {
+            margin-top: 30px;
+            background: #0f3460;
+            padding: 15px;
+            border-left: 5px solid var(--accent);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        code { background: #1a1a2e; padding: 2px 5px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>JS Beat Maker</h1>
+        <p>Learn how step sequencers work!</p>
+    </header>
+
+    <div class="container">
+        <div class="sequencer" id="sequencer">
+            </div>
+
+        <div class="controls">
+            <button id="play-btn">START</button>
+            <div>
+                <label>BPM: <span id="bpm-val">120</span></label>
+                <input type="range" id="bpm-slider" min="60" max="180" value="120">
+            </div>
+        </div>
+
+        <div class="edu-box">
+            <strong>How it works:</strong>
+            <p>This machine uses a 16-step grid representing a 4/4 time signature. 
+            Each column is a 16th note. In JavaScript, we use <code>setInterval</code> or <code>requestAnimationFrame</code> 
+            to loop through an array of states and trigger <code>Audio()</code> objects when a step is active.</p>
+        </div>
+    </div>
+
+    <script>
+        // 1. Audio Assets (Using open-source base64 or CDN links for a single-file demo)
+        const sounds = {
+            kick: new Audio('https://bencane.com/assets/media/kick.wav'),
+            snare: new Audio('https://bencane.com/assets/media/snare.wav'),
+            hihat: new Audio('https://bencane.com/assets/media/hihat.wav')
+        };
+
+        const instruments = ['kick', 'snare', 'hihat'];
+        const sequencerEl = document.getElementById('sequencer');
+        const playBtn = document.getElementById('play-btn');
+        const bpmSlider = document.getElementById('bpm-slider');
+        const bpmVal = document.getElementById('bpm-val');
+
+        let isPlaying = false;
+        let currentStep = 0;
+        let timer = null;
+        let bpm = 120;
+
+        // 2. Initialize the Grid
+        instruments.forEach(inst => {
+            const label = document.createElement('div');
+            label.className = 'instrument-label';
+            label.innerText = inst;
+            
+            const stepsContainer = document.createElement('div');
+            stepsContainer.className = 'steps';
+            stepsContainer.dataset.instrument = inst;
+
+            for (let i = 0; i < 16; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'step';
+                btn.dataset.index = i;
+                btn.addEventListener('click', () => btn.classList.toggle('active'));
+                stepsContainer.appendChild(btn);
+            }
+
+            sequencerEl.appendChild(label);
+            sequencerEl.appendChild(stepsContainer);
+        });
+
+        // 3. The Logic Loop
+        function runSequencer() {
+            const stepButtons = document.querySelectorAll('.step');
+            
+            // Remove 'playing' class from all
+            stepButtons.forEach(s => s.classList.remove('playing'));
+
+            // Check each instrument row for the current step
+            instruments.forEach(inst => {
+                const row = document.querySelector(`.steps[data-instrument="${inst}"]`);
+                const step = row.children[currentStep];
+                
+                step.classList.add('playing');
+                
+                if (step.classList.contains('active')) {
+                    playSound(inst);
+                }
+            });
+
+            currentStep = (currentStep + 1) % 16;
+        }
+
+        function playSound(inst) {
+            sounds[inst].currentTime = 0; // Rewind to start for rapid hits
+            sounds[inst].play();
+        }
+
+        // 4. Play/Pause Controls
+        playBtn.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                playBtn.innerText = 'STOP';
+                playBtn.style.background = '#555';
+                startTimer();
+            } else {
+                playBtn.innerText = 'START';
+                playBtn.style.background = 'var(--accent)';
+                clearInterval(timer);
+                currentStep = 0;
+            }
+        });
+
+        function startTimer() {
+            if (timer) clearInterval(timer);
+            // Math: (60s / BPM) / 4 (for 16th notes) * 1000ms
+            const interval = (60 / bpm / 4) * 1000;
+            timer = setInterval(runSequencer, interval);
+        }
+
+        bpmSlider.addEventListener('input', (e) => {
+            bpm = e.target.value;
+            bpmVal.innerText = bpm;
+            if (isPlaying) startTimer(); // Update speed in real-time
+        });
+
+    </script>
+</body>
+</html>
